@@ -49,6 +49,7 @@ setup(
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
     ],
     long_description=readme_description,
     long_description_content_type="text/markdown",
@@ -57,5 +58,6 @@ setup(
     entry_points={"console_scripts": ["translatepy = translatepy.__main__:main"]},
     package_data={
         "translatepy": ["LICENSE"],
+        "translatepy.translators": ["LICENSE"],
     },
 )
