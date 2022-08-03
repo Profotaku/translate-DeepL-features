@@ -29,7 +29,7 @@ from translatepy.utils.sanitize import remove_spaces
 from translatepy.utils.importer import get_translator
 
 
-class Translate():
+class Translate:
     """
     A class which groups all of the APIs
     """
@@ -93,7 +93,7 @@ class Translate():
             services_list[index] = service
         return service
 
-    def translate(self, text: str, destination_language: str, source_language: str = "auto", formality: str = None, dictionary: FormatedGlossary = "") -> TranslationResult:
+    def translate(self, text: str, destination_language: str, source_language: str = "auto", formality: str = None, dictionary: BaseTranslator.FormatedGlossary = "") -> TranslationResult:
         """
         Translates the given text to the given language
 
