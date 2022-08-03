@@ -1,6 +1,6 @@
 from os import path
 
-from setuptools import setup
+from setuptools import setup, find_packages
 
 with open(path.join(path.abspath(path.dirname(__file__)), "README.md"), encoding="utf-8") as f:
     readme_description = f.read()
@@ -13,7 +13,7 @@ def read_requirements(filename):
 
 setup(
     name="translatepy",
-    packages=["translatepy"],
+    packages=find_packages(),
     version="2.4",
     license="GNU General Public License v3 (GPLv3)",
     description="Translate, transliterate, get the language of texts in no time with the help of multiple APIs!",
