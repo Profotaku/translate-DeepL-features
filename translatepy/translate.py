@@ -1,5 +1,5 @@
 """
-translatepy v2.4
+translatepy v2.4 (DeepL)
 
 © Anime no Sekai — 2021
 """
@@ -93,7 +93,7 @@ class Translate():
             services_list[index] = service
         return service
 
-    def translate(self, text: str, destination_language: str, source_language: str = "auto") -> TranslationResult:
+    def translate(self, text: str, destination_language: str, source_language: str = "auto", formality: str = None, dictionary: FormatedGlossary = "") -> TranslationResult:
         """
         Translates the given text to the given language
 
@@ -105,7 +105,7 @@ class Translate():
         def _translate(translator: BaseTranslator, index: int):
             translator = self._instantiate_translator(translator, self.services, index)
             result = translator.translate(
-                text=text, destination_language=dest_lang, source_language=source_lang
+                text=text, destination_language=dest_lang, source_language=source_lang, formality=formality, dictionary=dictionary
             )
             if result is None:
                 raise NoResult("{service} did not return any value".format(service=translator.__repr__()))

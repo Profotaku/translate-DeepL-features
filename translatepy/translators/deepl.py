@@ -6,18 +6,20 @@ About the translation and the language endpoints:
     Arrangements and optimizations have been made\n
     Refer to Issue Animenosekai/translate#7 on GitHub for further details
 
-© Anime no Sekai — 2021
+© Anime no Sekai — 2022
 """
 
 from time import time, sleep
 from re import compile
 from random import randint
 from bs4 import BeautifulSoup
-
+import pandas as pd
+import warnings
 from translatepy.language import Language
 from translatepy.translators.base import BaseTranslator, BaseTranslateException
 from translatepy.utils.annotations import Tuple, List
 from translatepy.utils.request import Request
+
 
 SENTENCES_SPLITTING_REGEX = compile('(?<=[.!:?]) +')
 
@@ -28,14 +30,29 @@ class DeeplTranslateException(BaseTranslateException):
     """
 
     error_codes = {
-        1042911: "Too many requests."
+        -32600: 'Invalid Request: Invalid commonJobParams.',
+        1042911: "Too many requests.",
+        1042912: "Too many requests.",
+        1156049: "Invalid Request",
+        5000: "Unsported language for glossary.",  # arbitrary error numbers
+        5001: "Invalid CSV file: Same source and target language.",
+        5002: "Invalid CSV file: EN can only be combined with FR, DE, ES, IT, PL, JA.",
+        5003: "Invalid CSV file: FR can only be combined with EN, DE",
+        5004: "Invalid CSV file: DE can only be combined with EN, FR",
+        5005: "Invalid CSV file: ES can only be combined with EN",
+        5006: "Invalid CSV file: IT can only be combined with EN",
+        5007: "Invalid CSV file: PL can only be combined with EN",
+        5008: "Invalid CSV file: JA can only be combined with EN",
+        5009: "Invalid CSV file: Error in the header (or in its declaration in the 'load_glossary_from_csv' function)",
+        5010: "Syntax Error: The combination in the glossary does not correspond to the combination declared in the translate function.",
     }
 
 
-class GetClientState():
+class GetClientState:
     """
     DeepL Translate state manager
     """
+
     def __init__(self, request: Request):
         self.id_number = randint(1000, 9999) * 10000
         self.session = request
@@ -43,13 +60,13 @@ class GetClientState():
     def dump(self) -> dict:
         self.id_number += 1
         data = {
+            'id': self.id_number,
             'jsonrpc': '2.0',
             'method': 'getClientState',
             'params': {
                 'v': '20180814',
                 'clientVars': {},
-            },
-            'id': self.id_number,
+            }
         }
         return data
 
@@ -62,10 +79,11 @@ class GetClientState():
         return response["id"]
 
 
-class JSONRPCRequest():
+class JSONRPCRequest:
     """
     JSON RPC Request Sender for DeepL
     """
+
     def __init__(self, request: Request) -> None:
         self.client_state = GetClientState(request)
         try:
@@ -86,9 +104,9 @@ class JSONRPCRequest():
         return data
 
     def send_jsonrpc(self, method, params):
-        # Take a break 3 sec between requests, so as not to get a block by the IP address
-        if time() - self.last_access < 3:
-            distance = 3 - (time() - self.last_access)
+        # Take a break 5 sec between requests, so as not to get a block by the IP address
+        if time() - self.last_access < 5:
+            distance = 5 - (time() - self.last_access)
             sleep((distance if distance >= 0 else 0))
 
         request = self.session.post("https://www2.deepl.com/jsonrpc", json=self.dump(method, params))
@@ -101,10 +119,10 @@ class JSONRPCRequest():
 
 
 class DeeplTranslate(BaseTranslator):
-
     _supported_languages = {'AUTO', 'BG', 'ZH', 'CS', 'DA', 'NL', 'NL', 'EN', 'ET', 'FI', 'FR', 'DE', 'EL', 'HU', 'IT', 'JA', 'LV', 'LT', 'PL', 'PT', 'RO', 'RO', 'RO', 'RU', 'SK', 'SL', 'ES', 'ES', 'SV'}
+    _glossary_supported_languages = {'DE', 'EN', 'ES', 'FR', 'JA', 'IT', 'PL'}
 
-    def __init__(self, request: Request = Request(), preferred_langs: List = ["EN", "RU"]) -> None:
+    def __init__(self, request: Request = Request(), preferred_langs: List = ["EN", "FR"]) -> None:
         self.session = request
         self.jsonrpc = JSONRPCRequest(request)
         self.user_preferred_langs = preferred_langs
@@ -132,9 +150,81 @@ class DeeplTranslate(BaseTranslator):
 
         return resp["splitted_texts"][0], resp["lang"]
 
-    def _translate(self, text: str, destination_language: str, source_language: str) -> str:
+    def load_glossary_from_csv(self, file_path: str, separator: str = ";", encoding: str = "utf-8",
+                               source_language: str = "EN",
+                               target_language: str = "FR") -> BaseTranslator.FormatedGlossary:
+        """
+        Load a glossary from a CSV file.
+        The CSV file must have :
+            - Source Text column
+            - Target Text column
+            - Header row with the languages (ISO 639-1)
+        If you use the glossary with Polish or Japanese:
+        Make sure you have an encoding compatible with these languages (UTF-8 is strongly recommended)
+        """
+
+        source_language = source_language.upper()
+        target_language = target_language.upper()
+        # verifiy if language is supported
+        if source_language not in self._glossary_supported_languages or target_language not in self._glossary_supported_languages:
+            raise DeeplTranslateException(5000)
+        if source_language == target_language:
+            raise DeeplTranslateException(5001)
+        csv = pd.read_csv(file_path, sep=separator, encoding=encoding)
+        # check if combinations of source and target language are available by DeepL
+        if source_language == "EN" and target_language not in ["FR", "DE", "ES", "IT", "PL", "JA"]:
+            raise DeeplTranslateException(5002)
+        if source_language == "FR" and target_language not in ["EN", "DE"]:
+            raise DeeplTranslateException(5003)
+        if source_language == "DE" and target_language not in ["EN", "FR"]:
+            raise DeeplTranslateException(5004)
+        if source_language == "ES" and target_language not in ["EN"]:
+            raise DeeplTranslateException(5005)
+        if source_language == "IT" and target_language not in ["EN"]:
+            raise DeeplTranslateException(5006)
+        if source_language == "PL" and target_language not in ["EN"]:
+            raise DeeplTranslateException(5007)
+        if source_language == "JA" and target_language not in ["EN"]:
+            raise DeeplTranslateException(5008)
+        csv.columns = csv.columns.str.upper()
+        try:
+            csv.sort_values(by=[source_language], axis=0, ascending=True, inplace=True, na_position='first')
+            if not csv[source_language].is_unique:
+                warnings.warn(
+                    'Duplicate entries in the dictionary, only the last one will be kept. Please check the dictionary.')
+                csv.drop_duplicates(subset=[source_language], keep='last', inplace=True)
+        except KeyError:
+            raise DeeplTranslateException(5009)
+        return BaseTranslator.FormatedGlossary(csv, source_language, target_language)
+
+    def _translate(self, text: str, destination_language: str, source_language: str, formality: str = None,
+                   dictionary: BaseTranslator.FormatedGlossary = None) -> str:
+        # check if glossary conbination are same as source and target language
+        formated_string = ""
+        limit = 10
         priority = 1
         quality = ""
+        if dictionary != "":
+            if source_language.upper() not in dictionary.source_language or destination_language.upper() not in dictionary.target_language:
+                raise DeeplTranslateException(5010)
+            # check if word in the first column in disctionnary is in the text to translate
+            for word in dictionary.dataframe[source_language.upper()]:
+                if word in text and limit > 0:
+                    index = dictionary.dataframe[source_language.upper()].loc[lambda x: x == word].index
+                    target_word = dictionary.dataframe[dictionary.target_language.upper()][index]
+                    if '"' not in target_word.values[0] and '"' not in word:
+                        limit -= 1
+                        formated_string += word + "\t" + target_word.values[0] + "\n"
+                    else:
+                        # warning for words with quotes
+                        warnings.warn('Word with quotes in the dictionary: the pair will be ignored')
+                if word in text and limit == 0:
+                    warnings.warn(
+                        'The limit of 10 combinations per query has been reached, the rest of the combinations will be ignored')
+            if formated_string is not None:
+                formated_string = formated_string.replace('"\t"\n', '')
+                if formated_string[-1] == '\n':
+                    formated_string = formated_string[:-1]
 
         # splitting the text into sentences
         sentences, computed_lang = self._split_into_sentences(text, destination_language, source_language)
@@ -147,15 +237,23 @@ class DeeplTranslate(BaseTranslator):
         for sentence in sentences:
             i_count += sentence.count("i")
         ts = int(time() * 10) * 100 + 1000
-
         # params building
         params = {
             "jobs": jobs,
             "lang": {
+                "preference": {
+                    "weight": {},
+                    "default": "default"
+                },
+                "source_lang_computed": source_language,
                 "target_lang": destination_language,
-                "user_preferred_langs": [destination_language]
             },
             "priority": priority,
+            "commonJobParams": {
+                "browserType": 1,
+                "formality": formality,
+                "termbase": {"dictionary": formated_string}
+            },
             "timestamp": ts + (i_count - ts % i_count)
         }
 
@@ -174,7 +272,7 @@ class DeeplTranslate(BaseTranslator):
 
         if results is not None:
             translations = results["translations"]
-            return _detected_language, " ".join(obj["beams"][0]["postprocessed_sentence"] for obj in translations if obj["beams"])
+            return _detected_language, " ".join(obj["beams"][0]["sentences"][0]["text"] for obj in translations if obj["beams"][0]["sentences"][0]["text"])
 
     def _language(self, text: str) -> str:
         priority = 1
@@ -196,8 +294,9 @@ class DeeplTranslate(BaseTranslator):
         params = {
             "jobs": jobs,
             "lang": {
-                "target_lang": "EN",
-                "user_preferred_langs": ["EN"]
+                "preference": {"weight": {}, "default": "default"},
+                "target_lang": "FR",
+                "user_preferred_langs": ["FR"]
             },
             "priority": priority,
             "timestamp": ts + (i_count - ts % i_count)
@@ -259,9 +358,11 @@ class DeeplTranslate(BaseTranslator):
 
             job = {
                 "kind": "default",
+                "preferred_num_beams": 4,
                 "raw_en_context_after": after.copy(),
                 "raw_en_context_before": before.copy(),
-                "raw_en_sentence": sentence,
+                "sentences": [{"text": sentence, "id": 0, "prefix": ""}],
+
             }
             if quality != "":
                 job["quality"] = quality

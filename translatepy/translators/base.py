@@ -63,7 +63,13 @@ class BaseTranslator(ABC):
 
     _supported_languages = {}
 
-    def translate(self, text: str, destination_language: str, source_language: str = "auto") -> TranslationResult:
+    class FormatedGlossary:
+        def __init__(self, dataframe, source_language, target_language):
+            self.dataframe = dataframe
+            self.source_language = source_language
+            self.target_language = target_language
+
+    def translate(self, text: str, destination_language: str, source_language: str = "auto", formality: str = None, glossary: FormatedGlossary = "") -> TranslationResult:
         """
         Translates text from a given language to another specific language.
 
@@ -78,6 +84,12 @@ class BaseTranslator(ABC):
             source_language : str
                 If str it expects the code of the language that the `text` is written in. When using the default value (`auto`),
                 the `Translator` will try to find the language automatically.
+            formality : str
+                The formality/tonality of the text. It can be one of the following:
+                - "formal" (corresponds to "more" in official API)
+                - "informal" (corresponds to "less" in official API)
+                - None (corresponds to auto mode in official API, which is the default value)
+            glossary : FormatedGlossary
 
         Returns:
         --------
@@ -107,7 +119,7 @@ class BaseTranslator(ABC):
             source_language, translation = self._translations_cache[_cache_key]
         else:
             # Call the private concrete implementation of the Translator to get the translation
-            source_language, translation = self._translate(text, dest_code, source_code)
+            source_language, translation = self._translate(text, dest_code, source_code, formality, glossary)
 
             # Cache the translation values to speed up the translation process in the future
             self._translations_cache[_cache_key] = (source_language, translation)
@@ -121,7 +133,7 @@ class BaseTranslator(ABC):
             result=translation,
         )
 
-    def _translate(self, text: str, destination_language: str, source_language: str) -> str:
+    def _translate(self, text: str, destination_language: str, source_language: str, formality: str = None, glossary: FormatedGlossary = "") -> str:
         """
         Private method that concrete Translators must implement to hold the concrete
         logic for the translations. Receives the validated and normalized parameters and must
