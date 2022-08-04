@@ -74,7 +74,7 @@ The argument is optional. It can be one of the following:
     - JA <=> EN
 
 - As on the website, you can load 10 combinations per request but the module function automatically selects the combinations present in the text to be translated.
-- So you **can** load a csv with **can load** 10 entries but if your text to be translated contains more than 10 terms that are in your glossary, you will see a warning telling you that only the first 10 combinations will be used in the query.
+- So you **can** load a csv with **more than** 10 entries but if your text to be translated contains more than 10 terms that are in your glossary, you will see a warning telling you that only the first 10 combinations will be used in the query.
 - CSV with UTF-8 encoding is strongly recommended.
 - Double-quotes are automatically deleted (Please don't use them in your CSV file).
 
