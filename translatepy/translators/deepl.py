@@ -221,7 +221,7 @@ class DeeplTranslate(BaseTranslator):
                 if word in text and limit == 0:
                     warnings.warn(
                         'The limit of 10 combinations per query has been reached, the rest of the combinations will be ignored')
-            if formated_string is not None:
+            if formated_string != "":
                 formated_string = formated_string.replace('"\t"\n', '')
                 if formated_string[-1] == '\n':
                     formated_string = formated_string[:-1]
