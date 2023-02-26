@@ -63,25 +63,24 @@ class Translate:
                 Enabling fast mode (concurrent processing) or not
         """
         if not isinstance(services_list, Iterable):
-            raise ParameterTypeError("Parameter 'services_list' must be iterable, {} was given".format(type(services_list).__name__))
+            raise ParameterTypeError(
+                f"Parameter 'services_list' must be iterable, {type(services_list).__name__} was given"
+            )
 
         if not services_list:
             raise ParameterValueError("Parameter 'services_list' must not be empty")
 
         self.FAST_MODE = fast
 
-        if isinstance(request, type):  # is not instantiated
-            self.request = request()
-        else:
-            self.request = request
-
+        self.request = request() if isinstance(request, type) else request
         self.services = []
         for service in services_list:
             if isinstance(service, str):
                 service = get_translator(service)
-            if not isinstance(service, BaseTranslator):  # not instantiated
-                if not issubclass(service, BaseTranslator):
-                    raise ParameterTypeError("{service} must be a child class of the BaseTranslator class".format(service=service))
+            if not isinstance(service, BaseTranslator) and not issubclass(
+                service, BaseTranslator
+            ):
+                raise ParameterTypeError("{service} must be a child class of the BaseTranslator class".format(service=service))
             self.services.append(service)
 
     def _instantiate_translator(self, service: BaseTranslator, services_list: list, index: int):
@@ -187,11 +186,11 @@ class Translate:
 
         if __internal_replacement_function__ is not None:
             _translate = __internal_replacement_function__
-
-        if not isinstance(html, (PageElement, Tag, BeautifulSoup)):
-            page = BeautifulSoup(str(html), str(parser))
-        else:
-            page = html
+        page = (
+            html
+            if isinstance(html, (PageElement, Tag, BeautifulSoup))
+            else BeautifulSoup(str(html), parser)
+        )
         # nodes = [tag.text for tag in page.find_all(text=True, recursive=True, attrs=lambda class_name: "notranslate" not in str(class_name).split()) if not isinstance(tag, (PreformattedString)) and remove_spaces(tag) != ""]
         nodes = [tag for tag in page.find_all(text=True, recursive=True) if not isinstance(tag, (PreformattedString)) and remove_spaces(tag) != ""]
         with ThreadPool(int(threads_limit)) as pool:

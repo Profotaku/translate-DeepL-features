@@ -36,15 +36,16 @@ class DeeplTranslateException(BaseTranslateException):
         1156049: "Invalid Request",
         5000: "Unsported language for glossary.",  # arbitrary error numbers
         5001: "Invalid CSV file: Same source and target language.",
-        5002: "Invalid CSV file: EN can only be combined with FR, DE, ES, IT, PL, JA.",
-        5003: "Invalid CSV file: FR can only be combined with EN, DE",
-        5004: "Invalid CSV file: DE can only be combined with EN, FR",
-        5005: "Invalid CSV file: ES can only be combined with EN",
-        5006: "Invalid CSV file: IT can only be combined with EN",
-        5007: "Invalid CSV file: PL can only be combined with EN",
-        5008: "Invalid CSV file: JA can only be combined with EN",
-        5009: "Invalid CSV file: Error in the header (or in its declaration in the 'load_glossary_from_csv' function)",
-        5010: "Syntax Error: The combination in the glossary does not correspond to the combination declared in the translate function.",
+        5002: "Invalid CSV file: EN can only be combined with FR, DE, ES, IT, PL, JA, NL.",
+        5003: "Invalid CSV file: FR can only be combined with EN, DE, ES, IT, PL, JA, NL.",
+        5004: "Invalid CSV file: DE can only be combined with EN, FR, ES, IT, PL, JA, NL.",
+        5005: "Invalid CSV file: ES can only be combined with EN, FR, DE, IT, PL, JA, NL.",
+        5006: "Invalid CSV file: IT can only be combined with EN, FR, DE, ES, PL, JA, NL.",
+        5007: "Invalid CSV file: PL can only be combined with EN, FR, DE, ES, IT, JA, NL.",
+        5008: "Invalid CSV file: JA can only be combined with EN, FR, DE, ES, IT, PL, NL.",
+        5009: "Invalid CSV file: NL can only be combined with EN, FR, DE, ES, IT, PL, JA.",
+        5010: "Invalid CSV file: Error in the header (or in its declaration in the 'load_glossary_from_csv' function)",
+        5011: "Syntax Error: The combination in the glossary does not correspond to the combination declared in the translate function.",
     }
 
 
@@ -59,16 +60,15 @@ class GetClientState:
 
     def dump(self) -> dict:
         self.id_number += 1
-        data = {
+        return {
             'id': self.id_number,
             'jsonrpc': '2.0',
             'method': 'getClientState',
             'params': {
                 'v': '20180814',
                 'clientVars': {},
-            }
+            },
         }
-        return data
 
     def get(self) -> int:
         """
@@ -95,19 +95,18 @@ class JSONRPCRequest:
 
     def dump(self, method, params):
         self.id_number += 1
-        data = {
+        return {
             "jsonrpc": "2.0",
             "method": method,
             "params": params,
-            "id": self.id_number
+            "id": self.id_number,
         }
-        return data
 
     def send_jsonrpc(self, method, params):
         # Take a break 5 sec between requests, so as not to get a block by the IP address
         if time() - self.last_access < 5:
             distance = 5 - (time() - self.last_access)
-            sleep((distance if distance >= 0 else 0))
+            sleep(max(distance, 0))
 
         request = self.session.post("https://www2.deepl.com/jsonrpc", json=self.dump(method, params))
         self.last_access = time()
@@ -120,7 +119,7 @@ class JSONRPCRequest:
 
 class DeeplTranslate(BaseTranslator):
     _supported_languages = {'AUTO', 'BG', 'ZH', 'CS', 'DA', 'NL', 'NL', 'EN', 'ET', 'FI', 'FR', 'DE', 'EL', 'HU', 'IT', 'JA', 'LV', 'LT', 'PL', 'PT', 'RO', 'RO', 'RO', 'RU', 'SK', 'SL', 'ES', 'ES', 'SV'}
-    _glossary_supported_languages = {'DE', 'EN', 'ES', 'FR', 'JA', 'IT', 'PL'}
+    _glossary_supported_languages = {'DE', 'EN', 'ES', 'FR', 'JA', 'IT', 'PL', 'NL'}
 
     def __init__(self, request: Request = Request(), preferred_langs: List = ["EN", "FR"]) -> None:
         self.session = request
@@ -136,7 +135,7 @@ class DeeplTranslate(BaseTranslator):
         """
         REGEX_SPLIT = True
 
-        if REGEX_SPLIT is True:
+        if REGEX_SPLIT:
             SENTENCES_SPLITTING_REGEX.split(text), None
 
         params = {
@@ -172,20 +171,22 @@ class DeeplTranslate(BaseTranslator):
             raise DeeplTranslateException(5001)
         csv = pd.read_csv(file_path, sep=separator, encoding=encoding)
         # check if combinations of source and target language are available by DeepL
-        if source_language == "EN" and target_language not in ["FR", "DE", "ES", "IT", "PL", "JA"]:
+        if source_language == "EN" and target_language not in ["FR", "DE", "ES", "IT", "PL", "JA", "NL"]:
             raise DeeplTranslateException(5002)
-        if source_language == "FR" and target_language not in ["EN", "DE"]:
+        if source_language == "FR" and target_language not in ["EN", "DE", "ES", "IT", "PL", "JA", "NL"]:
             raise DeeplTranslateException(5003)
-        if source_language == "DE" and target_language not in ["EN", "FR"]:
+        if source_language == "DE" and target_language not in ["EN", "FR", "ES", "IT", "PL", "JA", "NL"]:
             raise DeeplTranslateException(5004)
-        if source_language == "ES" and target_language not in ["EN"]:
+        if source_language == "ES" and target_language not in ["EN", "FR", "DE", "IT", "PL", "JA", "NL"]:
             raise DeeplTranslateException(5005)
-        if source_language == "IT" and target_language not in ["EN"]:
+        if source_language == "IT" and target_language not in ["EN", "FR", "DE", "ES", "PL", "JA", "NL"]:
             raise DeeplTranslateException(5006)
-        if source_language == "PL" and target_language not in ["EN"]:
+        if source_language == "PL" and target_language not in ["EN", "FR", "DE", "ES", "IT", "JA", "NL"]:
             raise DeeplTranslateException(5007)
-        if source_language == "JA" and target_language not in ["EN"]:
+        if source_language == "JA" and target_language not in ["EN", "FR", "DE", "ES", "IT", "PL", "NL"]:
             raise DeeplTranslateException(5008)
+        if source_language == "NL" and target_language not in ["EN", "FR", "DE", "ES", "IT", "PL", "JA"]:
+            raise DeeplTranslateException(5009)
         csv.columns = csv.columns.str.upper()
         try:
             csv.sort_values(by=[source_language], axis=0, ascending=True, inplace=True, na_position='first')
@@ -194,19 +195,19 @@ class DeeplTranslate(BaseTranslator):
                     'Duplicate entries in the dictionary, only the last one will be kept. Please check the dictionary.')
                 csv.drop_duplicates(subset=[source_language], keep='last', inplace=True)
         except KeyError:
-            raise DeeplTranslateException(5009)
+            raise DeeplTranslateException(5010)
         return BaseTranslator.FormatedGlossary(csv, source_language, target_language)
 
     def _translate(self, text: str, destination_language: str, source_language: str, formality: str = None,
                    dictionary: BaseTranslator.FormatedGlossary = None) -> str:
         # check if glossary conbination are same as source and target language
         formated_string = ""
-        limit = 10
         priority = 1
         quality = ""
         if dictionary != "":
             if source_language.upper() not in dictionary.source_language or destination_language.upper() not in dictionary.target_language:
-                raise DeeplTranslateException(5010)
+                raise DeeplTranslateException(5011)
+            limit = 10
             # check if word in the first column in disctionnary is in the text to translate
             for word in dictionary.dataframe[source_language.upper()]:
                 if word in text and limit > 0:
@@ -232,10 +233,7 @@ class DeeplTranslate(BaseTranslator):
         # building the a job per sentence
         jobs = self._build_jobs(sentences, quality)
 
-        # timestamp generation
-        i_count = 1
-        for sentence in sentences:
-            i_count += sentence.count("i")
+        i_count = 1 + sum(sentence.count("i") for sentence in sentences)
         ts = int(time() * 10) * 100 + 1000
         # params building
         params = {
@@ -252,6 +250,7 @@ class DeeplTranslate(BaseTranslator):
             "commonJobParams": {
                 "browserType": 1,
                 "formality": formality,
+                "mode": "translate",
                 "termbase": {"dictionary": formated_string}
             },
             "timestamp": ts + (i_count - ts % i_count)
@@ -284,10 +283,7 @@ class DeeplTranslate(BaseTranslator):
         # building the a job per sentence
         jobs = self._build_jobs(sentences, quality)
 
-        # timestamp generation
-        i_count = 1
-        for sentence in sentences:
-            i_count += sentence.count("i")
+        i_count = 1 + sum(sentence.count("i") for sentence in sentences)
         ts = int(time() * 10) * 100 + 1000
 
         # params building
@@ -323,15 +319,11 @@ class DeeplTranslate(BaseTranslator):
         request = self.session.post("https://dict.deepl.com/" + source_language + "-" + destination_language + "/search?ajax=1&source=" + source_language + "&onlyDictEntries=1&translator=dnsof7h3k2lgh3gda&delay=800&jsStatus=0&kind=full&eventkind=keyup&forleftside=true", data={"query": text})
         if request.status_code < 400:
             response = BeautifulSoup(request.text, "html.parser")
-            _result = []
-            for element in response.find_all("a"):
-                if element.has_attr('class'):
-                    if "dictLink" in element["class"]:
-                        _result.append(element.text.replace("\n", ""))
-                        # if "featured" in element["class"]:
-                        #     results["featured"].append(element.text.replace("\n", ""))
-                        # else:
-                        #     results["less_common"].append(element.text.replace("\n", ""))
+            _result = [
+                element.text.replace("\n", "")
+                for element in response.find_all("a")
+                if element.has_attr('class') and "dictLink" in element["class"]
+            ]
             return source_language, _result
 
     def _build_jobs(self, sentences, quality=""):
@@ -351,11 +343,7 @@ class DeeplTranslate(BaseTranslator):
                 if len(before) > 4:
                     before.pop(0)  # the "before" array cannot be more than 5 elements long i guess?
                 before.extend([sentences[index - 1]])
-                if index > len(sentences) - 2:
-                    after = []
-                else:
-                    after = [sentences[index + 1]]
-
+                after = [] if index > len(sentences) - 2 else [sentences[index + 1]]
             job = {
                 "kind": "default",
                 "preferred_num_beams": 4,
@@ -371,9 +359,7 @@ class DeeplTranslate(BaseTranslator):
         return jobs
 
     def _language_normalize(self, language):
-        if language.id == "zho":
-            return "ZH"
-        return language.alpha2.upper()
+        return "ZH" if language.id == "zho" else language.alpha2.upper()
 
     def _language_denormalize(self, language_code):
         if str(language_code).lower() in {"zh", "zh-cn"}:
